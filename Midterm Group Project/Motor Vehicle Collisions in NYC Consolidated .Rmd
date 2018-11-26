@@ -1,0 +1,590 @@
+---
+title: 'Motor Vehicle Collisions in New York City: Exploratory Data Analysis'
+author: "Sadaf Asrar, Nelson Foster & Zhengzheng Yu"
+date: "March 4, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo=TRUE}
+
+getwd()
+library(MASS)
+library(ISLR) 
+library(doBy) 
+library(tidyverse) 
+library(dplyr)
+library(pastecs) 
+library(lubridate)
+library(readr)
+library (ggthemes)
+library (chron)
+library(devtools)
+library(choroplethr)
+library(zipcode)
+
+collision<-read.csv("C:/Users/uga/Documents/GW/Wright/Project_1R/NYPD_Motor_Vehicle_Collisions.csv")
+data.frame<-collision
+```
+
+First look at the data
+
+```{r}
+## Summary statistics for collision 
+
+head(collision)
+str(collision)
+summary(collision)
+names(collision)
+dim(collision)
+sapply(collision,class)
+```
+
+check the date range
+```{r}
+collision$DATE <- as.Date(collision$DATE, format = "%m/%d/%Y") 
+min(collision$DATE) 
+max(collision$DATE)
+```
+
+get the number of collisions per date
+```{r}
+library(dplyr)
+collision_by_day <- group_by(collision, DATE) %>% summarise(count = n())
+collision_by_day$count <- as.numeric(collision_by_day$count)
+head(collision_by_day$count)
+```
+
+
+```{r}
+## Additional data frames for each variable 
+Date <- (collision$DATE)                        
+Time <- (collision$TIME)                       
+Borough <- (collision$BOROUGH)
+ZipCd <- (collision$ZIP.CODE)
+Latitude <- (collision$LATITUDE)                    
+Longitude <- (collision$LONGITUDE)
+Location <- (collision$LOCATION)
+On_St_Name <- (collision$ON.STREET.NAME)                    
+Cross_St <- (collision$CROSS.STREET.NAME)              
+Off_St <- (collision$OFF.STREET.NAME)           
+Persons_Injured <- (collision$NUMBER.OF.PERSONS.INJURED)         
+Persons_Killed <- (collision$NUMBER.OF.PERSONS.KILLED)
+Pedestrians_Injured <- (collision$NUMBER.OF.PEDESTRIANS.INJURED)
+Pedestrians_Killed <- (collision$NUMBER.OF.PEDESTRIANS.KILLED)
+Cyclists_Injured <- (collision$NUMBER.OF.CYCLIST.INJURED)
+Cyclists_Killed <- (collision$NUMBER.OF.CYCLIST.KILLED)
+Motorists_Injured <- (collision$NUMBER.OF.MOTORIST.INJURED)
+Motorists_Killed <-(collision$NUMBER.OF.MOTORIST.KILLED)
+Contrib_Factor1 <- (collision$CONTRIBUTING.FACTOR.VEHICLE.1)
+Contrib_Factor2 <- (collision$CONTRIBUTING.FACTOR.VEHICLE.2)
+Contrib_Factor3 <- (collision$CONTRIBUTING.FACTOR.VEHICLE.3)
+Contrib_Factor4 <- (collision$CONTRIBUTING.FACTOR.VEHICLE.4)
+Contrib_Factor5 <- (collision$CONTRIBUTING.FACTOR.VEHICLE.5)
+Unique_Key <- (collision$UNIQUE.KEY)
+VehTypCd_1 <- (collision$VEHICLE.TYPE.CODE.1)
+VehTypCd_2 <- (collision$VEHICLE.TYPE.CODE.2)
+VehTypCd_3 <- (collision$VEHICLE.TYPE.CODE.3)
+VehTypCd_4 <- (collision$VEHICLE.TYPE.CODE.4)
+VehTypCd_5 <- (collision$VEHICLE.TYPE.CODE.5)
+```
+
+
+```{r}
+##fix(collision)
+
+### Stats for people killed in all collisions
+
+no_killed<-collision$NUMBER.OF.PERSONS.KILLED 
+
+summaryBy(no_killed ~ BOROUGH, data=collision,
+         FUN=function(x){m=sum(x)}) 
+
+summaryBy(no_killed ~ BOROUGH + ON.STREET.NAME, data=collision,
+         FUN=function(x){m=mean(x)}) 
+
+t.test(no_killed)
+
+BOROUGH<-collision$BOROUGH
+
+summaryBy(no_killed ~ BOROUGH, data=collision, 
+         FUN=function(x){m=sum(x)})
+summaryBy(no_killed ~ BOROUGH, data=collision, 
+         FUN=function(x){m=mean(x)})
+
+
+## No of people killed by Borough and street name 
+
+summaryBy(no_killed ~ BOROUGH + ON.STREET.NAME, data = collision,
+         FUN=function(x){m=sum(x)})
+
+## Mean no of people killed in accidents by Borough and street name
+
+summaryBy(no_killed ~ BOROUGH + ON.STREET.NAME, data = collision,
+         FUN=function(x){m=mean(x)})
+```
+
+```{r}
+##One way anova to test difference in no_killed by brorough 
+
+oneway.test(no_killed~BOROUGH)
+
+##hist of no killed
+
+hist (no_killed)
+
+##No injured
+
+no_injured<-collision$NUMBER.OF.PERSONS.INJURED
+
+## correlation of no kill and no injured
+
+cor(no_killed,no_injured, use = "complete", method="spearman")
+
+##Extracting hour from TIME
+
+hour_f = format(as.POSIXct(collision$TIME,format="%H:%M"),"%H")
+
+##Printing new hour variable
+
+hour_f<-collision$hour_f<-as.factor(hour_f)
+
+##Setting hour as numeric 
+
+## Source: http://stackoverflow.com/questions/27528907/how-to-convert-data-frame-column-from-factor-to-numeric
+
+hour_num<-collision$hour_num <- as.numeric(as.character(hour_f))
+```
+
+```{r}
+head(collision)
+
+fix(collision)
+
+## mean no killed by hour
+
+summaryBy(no_killed ~ hour_f, data = collision,
+         FUN=function(x){m=sum(x)})
+
+## count of number killed by hour
+
+summaryBy(no_killed ~ hour_num, data = collision,
+         FUN=function(x){m=mean(x)})
+
+##histogram of numeric hour
+
+hist(hour_num)
+
+##Correlation of hour and no killed
+
+cor(no_killed,hour_num, use = "complete", method="spearman")
+
+##Correlation of hour and no injured
+
+cor(no_injured,hour_num, use = "complete", method="spearman")
+
+##Creating a composite variable for injured or killed
+
+no_inj_kill<-collision$no_inj_kill<-as.numeric(no_injured+no_killed)
+```
+
+```{r}
+
+##Dummy vars for time of day 
+
+##Source: http://stackoverflow.com/questions/11952706/generate-a-dummy-variable
+
+## Then t test to see if no_killed is different for that time of day and all other times
+## Source: http://www.cookbook-r.com/Statistical_analysis/t-test/
+
+#Late night 
+
+late_night<-collision$late_night <- as.numeric(hour_num>=0 & hour_num<=3)
+
+late_night_inj_kill<-collision$late_night_inj_kill<-as.numeric(collision$no_inj_kill & late_night==1)
+
+t.test(collision$no_inj_kill ~ collision$late_night, collision)
+
+t.test(no_inj_kill ~ late_night, collision)
+
+#Early morning
+
+early_morning<-collision$early_morning <- as.numeric(hour_num>=4 & hour_num<=7)
+
+early_morning_inj_kill<-collision$early_morning_inj_kill<-as.numeric(collision$no_inj_kill & early_morning==1)
+
+
+t.test(no_inj_kill ~ early_morning, collision)
+
+#Morning
+
+morning<-collision$morning <- as.numeric(hour_num>=8 & hour_num<=11)
+
+morning_inj_kill<-collision$morning_inj_kill<-as.numeric(collision$no_inj_kill & morning==1)
+
+t.test(no_inj_kill ~ morning, collision)
+
+#Afternoon
+
+afternoon<-collision$afternoon <- as.numeric(hour_num>=12 & hour_num<=15)
+
+afternoon_inj_kill<-collision$afternoon_inj_kill<-as.numeric(collision$no_inj_kill & afternoon==1)
+
+
+t.test(no_inj_kill ~ afternoon, collision)
+
+#Evening
+
+evening<-collision$evening<- as.numeric(hour_num>=16 & hour_num<=19)
+
+evening_inj_kill<-collision$evening_inj_kill<-as.numeric(collision$no_inj_kill & evening==1)
+
+
+t.test(no_inj_kill ~ evening, collision)
+
+#Night
+
+night<-collision$night<- as.numeric(hour_num>=20 & hour_num<=23)
+
+night_inj_kill<-collision$enight_inj_kill<-as.numeric(collision$no_inj_kill & night==1)
+
+t.test(no_inj_kill ~ night, collision)
+
+##Creating a time of day variable by mdividing the day in 6 parts
+
+time_of_day<-collision$time_of_day <- ifelse(collision$evening ==1,"evening", ifelse(collision$night==1, "night", ifelse(collision$late_night==1, "late_night", ifelse(collision$early_morning==1, "early_morning", ifelse(collision$morning==1, "morning",ifelse(collision$afternoon==1, "afternoon", "time_unknown" ))))))
+```
+
+```{r}
+
+## Count of people killed or injured by time of day
+
+summaryBy(no_inj_kill ~ time_day, data = collision,
+         FUN=function(x){m=sum(x)})
+
+## Mean of people injured or killed  by time of day
+
+summaryBy(no_inj_kill ~ time_day, data = collision,
+         FUN=function(x){m=mean(x)})
+
+###One way anova to see if number injured or killed different by different time of day
+
+oneway.test(no_inj_kill~time_of_day)
+
+##Create a variable called rush_hour for 7-10 & 15-18 hundred hours
+
+rush_hour<-collision$rush_hour<-as.numeric(hour_num>=7 & hour_num<=10 | hour_num>=15 & hour_num<=18)
+
+## Count of people killed & injured at rush_hour vs non rush hour
+
+summaryBy(no_inj_kill ~ rush_hour, data = collision,
+         FUN=function(x){m=sum(x)})
+
+##Mean number of people killed and injured at rush hour vs non rush hour
+
+summaryBy(no_inj_kill ~ rush_hour, data = collision,
+         FUN=function(x){m=mean(x)})
+
+##t test to see if number killed and injured differs for rush hour vs non-rush hour
+
+t.test(no_killed ~ rush_hour, collision)
+t.test(no_injured ~ rush_hour, collision)
+
+t.test(no_inj_kill ~ rush_hour, collision)
+
+## Generating counts of no of inj & kill by  hour and different times of the day
+
+summaryBy(no_inj_kill ~ hour_f , data = collision,
+         FUN=function(x){m=sum(x)})
+
+summaryBy(no_inj_kill ~ time_of_day , data = collision,
+         FUN=function(x){m=sum(x)})
+
+summaryBy(no_killed ~ time_of_day , data = collision,
+         FUN=function(x){m=sum(x)})
+```
+
+use ggplot2 to create a line plot
+```{r}
+library(ggplot2)
+plot <- ggplot(collision_by_day, aes(DATE, count)) +
+geom_line(na.rm=TRUE, color = "darkgreen") +
+scale_x_date() +
+xlab("") +
+ylab("Number of Accidents") +
+ggtitle("Daily Car Accidents")
+plot
+```
+
+```{r message=FALSE}
+library(data.table)
+library(ggplot2)
+library(GGally)
+require(quantmod)
+require(reshape2)
+require(plyr)
+require(scales)
+require(zoo)
+
+```
+
+Calendar Heatmap
+```{r}
+data <- fread('NYPD.csv')
+dat <- {}
+dates <- as.Date(data$DATE,format = "%m/%d/%Y")
+dates <- na.omit(dates)
+dat <- as.data.frame(table(dates))
+names(dat) <- c('date','Freq')
+dat$date <- as.Date(dat$date)
+dat$year<-as.numeric(as.POSIXlt(dat$date)$year+1900)
+# the month too 
+dat$month<-as.numeric(as.POSIXlt(dat$date)$mon+1)
+# but turn months into ordered facors to control the appearance/ordering in the presentation
+dat$monthf<-factor(dat$month,levels=as.character(1:12),labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),ordered=TRUE)
+# the day of week is again easily found
+dat$weekday = as.POSIXlt(dat$date)$wday
+# again turn into factors to control appearance/abbreviation and ordering
+# I use the reverse function rev here to order the week top down in the graph
+# you can cut it out to reverse week order
+dat$weekdayf<-factor(dat$weekday,levels=rev(1:7),labels=rev(c("Mon","Tue","Wed","Thu","Fri","Sat","Sun")),ordered=TRUE)
+# the monthweek part is a bit trickier 
+# first a factor which cuts the data into month chunks
+dat$yearmonth<-as.yearmon(dat$date)
+dat$yearmonthf<-factor(dat$yearmonth)
+# then find the "week of year" for each day
+dat$week <- as.numeric(format(dat$date,"%W"))
+
+# and now for each monthblock we normalize the week to start at 1 
+dat<-ddply(dat,.(yearmonthf),transform,monthweek=1+week-min(week))
+dat <- na.omit(dat)
+# Now for the plot
+p<- ggplot(dat, aes(monthweek, weekdayf, fill = dat$Freq)) + 
+    geom_tile(colour = "white") + facet_grid(year~monthf) + scale_fill_gradient(low="green", high="red") +
+    labs(title = "NYPD Vehicle Collisions Time-Series Calendar Heatmap") +  xlab("Week of Month") + ylab(" ")
+p
+
+
+```
+
+Motor Vehicle Collision Density in NYC
+```{r}
+
+## Using ggmap
+library(ggmap)
+library(gridExtra)
+
+d=read.csv('NYPD.csv')
+
+d_clean=d[which(regexpr(',',d$LOCATION)!=-1),]
+
+comm=regexpr(',',d_clean$LOCATION)
+d_clean$loc=as.character(d_clean$LOCATION)
+d_clean$lat=as.numeric(substr(d_clean$loc,2,comm-1))
+d_clean$long=as.numeric(substr(d_clean$loc,comm+1,nchar(d_clean$loc)-1))
+d_clean$year=substr(d_clean$DATE,7,10)
+
+d_2015=d_clean[which(d_clean$year=='2015'),c('long','lat')]
+d_2016=d_clean[which(d_clean$year=='2016'),c('long','lat')]
+```
+
+```{r}
+
+## Using ggmap
+ny_plot=ggmap(get_map('New York, New York',zoom=12, maptype='terrain'))
+
+plot1=ny_plot+
+stat_density2d(data= d_2015, aes(x = d_2015$long, y = d_2015$lat, alpha=.75,fill=..level..),bins = 10, geom = 'polygon')+
+guides(fill = guide_colorbar(barwidth = 1, barheight = 12)) +
+scale_alpha(guide = FALSE)+ 
+xlab(' ')+ylab(' ')+
+ggtitle('Vehicle Accidents 2015')
+
+plot2=ny_plot+
+stat_density2d(data= d_2016, aes(x = d_2016$long, y = d_2016$lat, alpha=.75,fill=..level..),bins = 10, geom = 'polygon')+
+guides(fill = guide_colorbar(barwidth = 1, barheight = 12)) +
+scale_alpha(guide = FALSE)+ 
+xlab(' ')+ylab(' ')+
+ggtitle('Vehicle Accidents  2016')
+
+grid.arrange(plot1, plot2,nrow=1,ncol=2) 
+```
+
+```{r}
+NYPD_Data$DATE = as.Date(NYPD_Data$DATE, "%m/%d/%Y") #Changed the class type of DATE column to 'date' from
+                                                     #'character' so that I can access to the year, month and day
+                                                     #data seperately
+by_borough <- tbl_df(NYPD_Data) %>% 
+  filter(BOROUGH != "") %>%
+  mutate(Year = year(DATE)) %>% 
+  group_by(BOROUGH, Year) 
+```
+
+```{r}
+by_borough$TIME = sapply(by_borough$TIME, function(x) paste0(x, ":00"))
+by_borough$TIME = times(by_borough$TIME)
+
+late_night_Time_People_Deaths <- by_borough %>% 
+                              filter(TIME > as.numeric(times('00:00:00')) & TIME < as.numeric(times('03:59:00'))) %>%
+                                  summarise(Total_People_Killed_late_Night = sum(NUMBER.OF.PERSONS.KILLED))
+
+early_Morning_Time_People_Deaths <- by_borough %>% 
+                              filter(TIME < as.numeric(times('04:00:00')) & TIME >= as.numeric(times('07:59:00'))) %>%
+                              summarise(Total_People_Killed_early_Morning = sum(NUMBER.OF.PERSONS.KILLED))
+Morning_Time_People_Deaths <- by_borough %>% 
+                              filter(TIME < as.numeric(times('08:00:00')) & TIME >= as.numeric(times('11:59:00'))) %>%
+                              summarise(Total_People_Killed_Morning = sum(NUMBER.OF.PERSONS.KILLED))
+
+afternoon_People_Deaths <- by_borough %>% 
+                              filter(TIME >= as.numeric(times('12:00:00'))  & TIME < as.numeric(times('15:59:00'))) %>%
+                              summarise(Total_People_Killed_afternoon = sum(NUMBER.OF.PERSONS.KILLED))
+evening_People_Deaths <- by_borough %>% 
+                              filter(TIME >= as.numeric(times('16:00:00'))  & TIME < as.numeric(times('19:59:00'))) %>%
+                              summarise(Total_People_Killed_evening = sum(NUMBER.OF.PERSONS.KILLED))
+                              
+night_People_Deaths <- by_borough %>% 
+                              filter(TIME >= as.numeric(times('20:00:00'))) %>%
+                              summarise(Total_People_Killed_night = sum(NUMBER.OF.PERSONS.KILLED))
+
+Time_List = list(late_night_Time_People_Deaths,early_Morning_Time_People_Deaths,Morning_Time_People_Deaths,afternoon_People_Deaths,evening_People_Deaths,night_People_Deaths)
+Total_Death_Compared_by_Time = Reduce(function(x,y) merge(x,y, all = TRUE), Time_List) 
+Total_Death_Compared_by_Time
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+##MAJOR FINDINGS 
+#(All analysis uses the variable "no_inj_kill", which is the sum of people killed and people injured)
+
+#To answer our research question of whether there is a relationship between time of day and injuries and death in motor vehicle collision, we tried to answer the following questions.
+
+#0. What are the number of people injured and killed for the 24 hours of the day? What is the mean number of injuries and deaths per motor vehicle collisions for each hour of the day?
+
+summaryBy(no_inj_kill ~ hour_f , data = collision,
+         FUN=function(x){m=sum(x)})
+
+summaryBy(no_inj_kill ~ hour_f , data = collision,
+         FUN=function(x){m=mean(x)})
+
+
+#1. IS there a correlation of number of people injured and killed against time?
+
+cor(no_inj_kill,hour_num, use = "complete", method="spearman")
+
+###The correlation coffecient is 0.0212, which is very weak. The correlation coefficient tells us the relationship between number of people killed and injured and time in 24 hours, i.e., do the number of injures and death in motor vehicle collisions increase when the time (measured in 24 hour scale) increase. The correlation found is weak. However, it may not be the best way to test this relationship
+
+#To test this relationship differently, we decided to split up the day in 6 different times of day, i.e., late_night (0:00-03:59), early_morning (04:00-07:59), morning (08:00-11:59), afternoon (12:00-15:59), evening (16:00-19:59), and night (20:00-23:00)
+
+
+#2. Based on this division of time of day, are the number of people injured & killed in motor vehicle collisions different for different time of day?
+
+#To answer this question, we first conducted a one-way anova, that tests whether the number of people injured and killed are statistically significantly different for the 6 different times of day.
+
+oneway.test(no_inj_kill~time_of_day)
+
+### The one way anova result produces a p value below 0.05, which means, yes, the number of people injured and killed are different for the 6 differnt times of day.
+
+#However we do not know which time of day has most injuries and death or which time of day has the highest mean injuries or death? 
+
+#3. Which time of day had most no of people injured and killed 
+
+summaryBy(no_inj_kill ~ time_of_day , data = collision,
+         FUN=function(x){m=sum(x)})
+## The answer is eveneing  when 66398 people were in jured and killed 
+
+#4. Which time had largest mean number of people injured and killed
+
+summaryBy(no_inj_kill ~ time_of_day , data = collision,
+         FUN=function(x){m=mean(x)})
+
+## The answer is late night  where the mean number of deaths for all collisions was 0.3227915
+
+#4.a. Are the number of people injured and killed at late night different from all other times of day?
+
+#To test this, we conduct a t test of number of injuries and death over the binary variable of whether the collision was at late night vs non-late night
+
+t.test(no_inj_kill ~ late_night, collision)
+
+##The t test of number of injured and killed during light night vs non-late night is statistically significant at the 5% level, which means it is different.
+
+#4.b. Are the number of people injured and killed at late night different from EACH of the other times of day?
+
+#late night vs evening
+
+t.test(late_night_inj_kill,evening_inj_kill)
+
+#late night vs night
+
+t.test(late_night_inj_kill,night_inj_kill)
+
+#late night vs early morning
+
+t.test(late_night_inj_kill, early_morning_inj_kill)
+
+#late night vs morning
+
+t.test(late_night_inj_kill,morning_inj_kill)
+
+#late night vs afternoon
+
+t.test(late_night_inj_kill,afternoon_inj_kill)
+
+#late night vs evening
+
+t.test(late_night_inj_kill,evening_inj_kill)
+
+#The mean number of people injured and killed at late night was found to be statistically significantly different from each of the other times of day.
+
+#5. So, what is the most dangerous time of day?
+
+## Using raw number or count, it is evening, as evening has the highest number of people who were injured and killed in motor vehicle collisions. However, if we factor in the fact that the number of collisions differs for time of day, then the most dangerous time for traffic collisions is late night, as it has highest mean number of injuries and death per motor vehicle collision. The number of injuries and death per motor vehicle collision at late night was found to be statistically significantly different for each of the other times of day. 
+
+#6. Just out of curiosity, we checked if injuries and death in collisions were different for rush hour vs non-rush hour
+
+#We defined rush hour as 07:00-10:59 and 15:00-18:59
+
+#Count of people injured and killed for rush hour vs non-rush hour
+
+summaryBy(no_inj_kill ~ rush_hour, data = collision,
+         FUN=function(x){m=sum(x)})
+
+#Non-rush hour injuries and death: 142187
+#Rush hour injuries and death:109108 
+
+#Mean number of  people injured and killed for rush hour vs non-rush hour
+
+summaryBy(no_inj_kill ~ rush_hour, data = collision,
+         FUN=function(x){m=mean(x)})
+
+#Non-rush hour mean injuries and death: 0.2710787
+#Rush hour mean injuries and death: 0.2396177
+
+# t test to see difference
+
+t.test(no_inj_kill ~ rush_hour, collision)
+
+#Since the p value of the t test is below 0.05, the mean number of people injued and killed was statistically significantly different for rush hour vs non-rush hour. 
+
+fix(collision)
+
+```
