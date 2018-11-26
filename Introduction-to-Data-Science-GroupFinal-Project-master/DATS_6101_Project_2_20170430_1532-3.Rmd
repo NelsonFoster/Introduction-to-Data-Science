@@ -1,0 +1,461 @@
+---
+title: 'DATS 6101 Project II: Understanding Environmental Vulnerabilty'
+author: "Sadaf Asrar, Nelson Foster,Qianyi Huang, & Zhengzheng Yu"
+date: "April 30, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Research Question
+
+Initial research question
+
+What environmental and economic factors contribute to rising water levels in low elevation coastal zones (LECZ)? Specifically, can we predict when an LECZ will go under water?
+
+The question was too broad and had to be narrowed down to a single LECZ for time series prediction. We considered Bangladesh as a case study and identified plenty of prior research on this topic that uses robust empirical time series models to predict the rising sea level in Bangladesh.  
+
+Given a lot of prior research has been conducted on this topic, we decided to revise the research question to identify factors that contribute to the environment's ability to withstand external shocks.  
+
+Revised research question
+
+What factors contribute to the vulnerability of the natural environment to sustain natural and human-made disasters? Specifically, what factors contribute to a country's score on the Environmental Vulnerability Index (EVI)?
+
+Why use EVI?
+
+Prepared by South Pacific Applied Geoscience Commission (SOPAC), UNEP, and other partners, the EVI is an aggregated indicator made up of 50 sub-indicators and sub-indices which provides an estimation of the ability of a country or a region to sustain future environmental and ecological disasters (Kaly, Pratt, Mitchell, 2004). 
+
+Overall EVI Scale is as follows: 
+i.	 Extremely vulnerable: 365+; 
+ii.	 Highly vulnerable: 315-364; 
+iii. Vulnerable: 265-314; and
+iv.	 At risk: 215-264 
+v.	 Resilient :<264. (Kaly, U.L.; C.R. Pratt; J. Mitchell, 2004).
+
+2.	Prior Research
+
+Qualitative research
+
+Authored by UN ISDR, "Environment and Vulnerability: Emerging Prospects" identified 5 pathways that link the natural environment to the ability to sustain disaster, and then connect the management of the natural environment to ability to minimize vulnerability to future disasters. The pathways are:  
+a.	Natural disasters can be brought on human action
+b.	The health of the ecosystem can serve as a defense barrier from natural disasters
+c.	Communities in depleted or marginalized ecosystems have less resistance to future environmental shocks
+d.	Some natural disasters need urgent action  
+e.	Depletion of the ecosystem can itself be a risk (UN ISDR, 2005).
+
+Authored by William Donner and Havidán Rodríguez, "Disaster Risk and Vulnerability: The Role and Impact of Population and Society" identified population density in urban areas and social-economic make-up of the population as key factors in the vulnerability of the natural environment to sustain shocks (Donner & Rodríguez, 2011).
+
+Quantitative Research
+
+Authored by Kouakou et al, "Environmental Vulnerability Index: Application to the White Bandama Bassin In the Northern Côte D'ivoire" identified factors which contribute to the environmental vulnerability of the White Bandama Basin (WBB) by examining factors that contribut global climate change, country specific characteristics, and anthropogenic activities as the primary contributors to the EVI score of WBB (Kouakou, et al., 2013).
+
+Authored by Gowrie, "Environmental Vulnerability Index for the Island of Tobago, West Indies" developed the EVI for the island of Tobago and identified anthropogenic activities being the biggest driver of the EVI and concluded that the environmental vulnerability could be managed by efficient use of resources brought on by clear communication between agencies that manage those resources. (Gowrie, 2003)
+
+Since we could not identify any studies that examined factors affecting EVI overall, we decided to answer our research question of what factors contribute to EVI using country level data.  
+
+3.	Data Selection 
+
+Data Selection 
+
+We used the EVI 2004 data, World Bank Climate Change data, and the NASA SEDAC LECZ datasets to create a composite analytic dataset that contains the EVI as well as a host of country-specific characteristics and LECZ indicators for the year 2004 where the unit of observation is a country. A brief overview of the different data sources are provided below.
+
+EVI 2004 data
+
+Prepared by South Pacific Applied Geoscience Commission (SOPAC), UNEP, and other partners, the EVI 2004 dataset contains the EVI score at  country level for 2004 as well as other environmental indicators. The data was obtained from the Socio Economic Data and Applications Center (SEDAC) website (South Pacific Applied Geoscience Commission - SOPAC; United Nations Environmental Program - UNEP, 2004). 
+
+
+World Bank Climate Change Data (WBCC)
+
+Prepared by the World Bank, the WBCC dataset contains a set of macro-economic, environmental, pollution, and country specific characteristic data from 1960-2015 (World Bank, 2017)
+
+
+NASA SEDAC Low-Elevation Climate Zone (LECZ) datasets
+
+Prepared by Center for International Earth Science Information Network - CIESIN - Columbia University, the LECZ datasets contain raw data of population and land area counts in continental as well as country aggregations for LECZs (Center for International Earth Science Information Network - CIESIN, 2013). 
+
+4. Data Preperation
+
+Loading all the relevant libraries. 
+
+```{r}
+require(knitr)
+library(ISLR)
+library(dplyr)
+library(ROCR)
+library(pROC)
+library(pscl)
+library(ResourceSelection)
+library(reshape)
+library(reshape2)
+library(stringr)
+library(mice)
+library(ResourceSelection)
+library (leaps)
+library(fmsb)
+```
+Loading the datasets and generated summary statistics to understand the shape, format, and contents of each of the datasets.To interactively explore the master data, please visit the EVI Map dashboard at the url: https://public.tableau.com/profile/sadaf8581#!/vizhome/UnderstandingEnvironmentalVulnerability/EVIMap
+
+```{r}
+#World Bank Climate Change Data
+WBCC <-read.csv("WB_Climate_Change.csv")
+summary(WBCC)
+str(WBCC)
+
+#NASA SEDAC Low-Elevation Climate Zone datasets
+lecz_country90 <- read.csv("lecz_country_90m.csv")
+summary(lecz_country90)
+#str(lecz_continent90)
+lecz_continent90 <- read.csv("lecz_continent_90m.csv")
+str(lecz_continent90)
+lecz_country1km90m <- read.csv("lecz_country_1km_90m.csv")
+str(lecz_country1km90m)
+
+#NASA SEDAC Environmental Vulnerability Index
+EVI <- read.csv("EVI_2004.csv")
+summary(EVI)
+str(EVI)
+```
+Reshaped the WBCC dataset and extracted data for 2004, where the unit of observation is a country
+
+```{r}
+WBCC_pvt <- cast(WBCC, Country.Code ~ Indicator.Name, value = 'X2004')
+```
+
+Reshaped the LECZ datasets to extract the percent of rural and urban populations living in LECZ with elevations at or below 5m for the year 2010, which was the closest year we could match to 2004. The unit of observation of the data was a country. 
+
+```{r}
+#Reshaping datasets
+lecz_country90_e5<-subset(lecz_country90, lecz_country90$ElevationZone=="Elevations Less Than or Equal To 5m")
+
+lecz_country90_e5_pla <- cast(lecz_country90_e5, Country.Code ~UrbanRuralDesignation, value="PercentofCountryLandArea" )
+
+#Renaming variables
+names(lecz_country90_e5_pla)[names(lecz_country90_e5_pla) == 'Rural'] <- 'pcnt_country_land_area_rural'
+names(lecz_country90_e5_pla)[names(lecz_country90_e5_pla) == 'Urban'] <- 'pcnt_country_land_area_urban'
+
+# Creating data frame wth country code and PercentofCountryPopulation2010 in rural and urban regions
+
+lecz_country90_e5_p_pop2010 <- cast(lecz_country90_e5, Country.Code ~UrbanRuralDesignation, value="PercentofCountryPopulation2010" )
+
+names(lecz_country90_e5_p_pop2010)[names(lecz_country90_e5_p_pop2010) == 'Rural'] <- 'pcnt_country_pop2010_rural'
+
+names(lecz_country90_e5_p_pop2010)[names(lecz_country90_e5_p_pop2010) == 'Urban'] <- 'pcnt_country_pop2010_urban'
+```
+
+Merged the reshaped WBCC and LECZ datasets to the EVI dataset using country codes to produce an initial analytic dataset titled "master_df" that had 178 observations
+
+```{r}
+master_df1<-merge(EVI, WBCC_pvt, by = "Country.Code")
+master_df2<-merge(lecz_country90_e5_pla,lecz_country90_e5_p_pop2010 , by = "Country.Code")
+master_df<-merge(master_df1, master_df2, by="Country.Code")
+```
+
+Renamed the variables by removing special characters and identified 11 key independent variables and EVI based on literature review.  The variables are:
+i.	  EVI;
+ii.	  Total GHG Emissions KT;
+iii.	Percent of Ag Land;
+iv.	  Percent of Population in Urban Areas;
+v.	  Percent of Rural Land;
+vi.	  Percent of Urban Land;
+vii.	Mortality Rate Under 5 (1000 Births);
+viii.	Biodiversity Sub-Index (CBDEVI);
+ix.	  Climate Change Sub-Index (CCEVI);
+x.  	CO2 emissions KT;
+xi.	  Renewable electricity output as a percent of total electricity output;
+xii.	Foreign Direct Investment net inflows as percent of GDP.
+
+```{r}
+names(master_df) <- gsub("\\(", "", names(master_df))
+names(master_df) <- gsub("\\%", "pcnt", names(master_df))
+names(master_df) <- gsub("\\$", "Dollars_", names(master_df))
+names(master_df) <- gsub("\\/", "_per_", names(master_df))
+names(master_df) <- gsub("\\=", "_equals_", names(master_df))
+names(master_df) <- gsub("\\,", "", names(master_df))
+names(master_df) <- gsub("\\-", "_", names(master_df))
+names(master_df) <- gsub(")", "", names(master_df))
+names(master_df) <- gsub(" ", "_", names(master_df))
+
+EVI_high<-master_df$EVI_high<- ifelse((master_df$EVI>=315), 1, 0)
+write.csv(master_df, file = "master_df.csv")
+head(master_df)
+names(master_df)
+
+```
+
+Ran an initial linear regression model with EVI as the dependant variable against all 11 independent variables. The regression had a VIF of 3.889824, R^2 of 0.7429, adjusted-R^2 of 0.7205 where CBDEVI and CCEVI were the only variables found to be statistically significant.
+
+```{r}
+
+#Running initial regressions by omitting NA. The final model will include imputed values
+
+reg_ols <- lm(EVI~CO2_emissions_kt+Total_greenhouse_gas_emissions_kt_of_CO2_equivalent+Agricultural_land_pcnt_of_land_area+Urban_population_pcnt_of_total+pcnt_country_land_area_rural+pcnt_country_land_area_urban+Foreign_direct_investment_net_inflows_pcnt_of_GDP+Foreign_direct_investment_net_inflows_pcnt_of_GDP+Mortality_rate_under_5_per_1000_live_births+Renewable_electricity_output_pcnt_of_total_electricity_output+CBDEVI+CCEVI
+, na.action=na.omit, master_df)
+
+VIF(reg_ols)
+summary(reg_ols)
+
+````
+
+Created a revised master dataset titled "master_df_rel" which only included the 12 relevant variables.
+
+```{r}
+##Subsetting the master_df to keep only the relevant vars (ones we use in the model)
+
+relevant_vars <- c("EVI","CO2_emissions_kt","Total_greenhouse_gas_emissions_kt_of_CO2_equivalent","Agricultural_land_pcnt_of_land_area","Urban_population_pcnt_of_total","pcnt_country_land_area_rural","pcnt_country_land_area_urban","Foreign_direct_investment_net_inflows_pcnt_of_GDP","Mortality_rate_under_5_per_1000_live_births","Renewable_electricity_output_pcnt_of_total_electricity_output", "CBDEVI", "CCEVI")
+
+#Creating a new data frame called master_df_rel that only includes the relevant vars
+master_df_rel <- master_df[relevant_vars]
+head(master_df_rel)
+`````
+
+Generated summary statistics of the "master_df_rel" dataset and examined whether the variables were normally distributed
+
+```{r}
+summary(master_df_rel)
+str(master_df_rel)
+
+shapiro.test(master_df_rel$EVI)
+shapiro.test(master_df_rel$CO2_emissions_kt)
+shapiro.test(master_df_rel$Total_greenhouse_gas_emissions_kt_of_CO2_equivalent)
+shapiro.test(master_df_rel$Agricultural_land_pcnt_of_land_area)
+shapiro.test(master_df_rel$Urban_population_pcnt_of_total)
+shapiro.test(master_df_rel$pcnt_country_land_area_rural)
+shapiro.test(master_df_rel$pcnt_country_land_area_urban)
+shapiro.test(master_df_rel$Foreign_direct_investment_net_inflows_pcnt_of_GDP)
+shapiro.test(master_df_rel$Mortality_rate_under_5_per_1000_live_births)
+shapiro.test(master_df_rel$Renewable_electricity_output_pcnt_of_total_electricity_output)
+shapiro.test(master_df_rel$CBDEVI)
+shapiro.test(master_df_rel$CCEVI)
+
+```
+From summary statistics we identified that none of the independent variables were normally distributed. Additionally, while the EVI is a continuous variable, it does not contain a true zero. EVI ranges from 150-450 and is interpreted like an ordinal variable where a score of 315 and above indicates that a country is highly vulnerable. Due to these reason we decided to scale or normalize the EVI variable. 
+
+In addition to the EVI variable, we also scaled the independent variables so that all 12 variables in the models would be scaled, which would allow us to run a scaled or beta or standardized regression where all the variables are normalized. An added advantage to running scaled regression is that coefficients of all independent variables are on the same scale, which allows us to do an apples to apples comparison of the effect each independent variable has on the dependent variable.
+
+We created a revised dataset titled "master_df_rel_scaled" that only included the 12 scaled variables.
+
+
+```{r}
+evi_s<-master_df_rel$evi_s<-scale(master_df_rel$EVI)
+co2<-master_df_rel$co2<-scale(master_df_rel$CO2_emissions_kt)
+greenhouse_gas<-master_df_rel$greenhouse_gas<-scale(master_df_rel$Total_greenhouse_gas_emissions_kt_of_CO2_equivalent)
+agricultural_land<-master_df_rel$agricultural_land<-scale(master_df_rel$Agricultural_land_pcnt_of_land_area)
+ubran_pop<-master_df_rel$ubran_pop<-scale(master_df_rel$Urban_population_pcnt_of_total)
+country_land_rural<-master_df_rel$country_land_rural<-scale(master_df_rel$pcnt_country_land_area_rural)
+country_land_urban<-master_df_rel$country_land_urban<-scale(master_df_rel$pcnt_country_land_area_urban)
+foreign_investment<-master_df_rel$foreign_investment<-scale(master_df_rel$Foreign_direct_investment_net_inflows_pcnt_of_GDP)
+mortality_rate<-master_df_rel$mortality_rate<-scale(master_df_rel$Mortality_rate_under_5_per_1000_live_births)
+renewable_electricity<-master_df_rel$renewable_electricity<-scale(master_df_rel$Renewable_electricity_output_pcnt_of_total_electricity_output)
+cbdevi_s<-master_df_rel$cbdevi_s<-scale(master_df_rel$CBDEVI)
+ccevi_s<-master_df_rel$ccevi_s<-scale(master_df_rel$CCEVI)
+
+
+head(master_df_rel)
+
+relevant_vars_scaled <- c("evi_s","co2","greenhouse_gas","agricultural_land","ubran_pop","country_land_rural","country_land_urban","foreign_investment","mortality_rate","renewable_electricity", "cbdevi_s", "ccevi_s")
+
+master_df_rel_scaled <- master_df_rel[relevant_vars_scaled]
+head(master_df_rel_scaled)
+
+```
+
+Since the dataset contained missing values, and as we have only 178 observations in the dataset, we imputed the missing values using the predicted mean method and created the final analytical master dataset titled "final_df". We generated summary statistics of the dataset and ran parwaise correlations of the 12 variables to identify the extent of multicollinearity in our model.  
+
+```{r}
+imp_master_df <- mice(master_df_rel_scaled,m=5,maxit = 50, method = "pmm")
+imp_master_df <- complete(imp_master_df,1)
+summary(imp_master_df)
+str(imp_master_df)
+cor(imp_master_df, use="complete.obs", method="kendall") 
+
+write.csv(imp_master_df, file = "imp_master_df.csv")
+head(imp_master_df)
+names(imp_master_df)
+
+final_df <-read.csv("imp_master_df _2.csv")
+summary(final_df)
+str(final_df)
+cor(final_df, use="complete.obs", method="kendall") 
+
+````
+
+We re-ran the initial regression model, but this time using scaled EVI as the dependent variable and all 11 scaled independent variables from the "final_df" dataset and called this Model 1. The following  variables were statistically significant in Model 1: Percent of Ag Land, Mortality Rate Under 5 (1000 Births), CBDEVI, and CCEVI.
+
+```{r}
+model_1<- lm(evi_s~co2+greenhouse_gas+agricultural_land+ubran_pop+country_land_rural+country_land_urban+foreign_investment+mortality_rate+renewable_electricity+cbdevi_s+ccevi_s, final_df)
+
+summary(model_1)
+VIF(model_1)
+
+```
+
+Based on the results of Model 1 we developed Model 2 that regressed scaled EVI only on the variables which were statistically significant in Model 1, i.e., Percent of Ag Land, Mortality Rate Under 5 (1000 Births), CBDEVI, and CCEVI.  All 4 independent variables were statistically significant in Model 2. While Model 2 had a lower VIF it also had a slightly lower R^2 and adjusted-R^2.
+
+```{r}
+model_2<- lm(evi_s~agricultural_land+mortality_rate+cbdevi_s+ccevi_s, final_df)
+
+summary(model_2)
+VIF(model_2)
+
+```
+
+To better identify which variables to include in the model, we ran forward, backward and hybrid stepwise regressions. All three stepwise regression results indicated that adjusted-R^2 is maximized when the following variables are not included in the model:
+
+i.   CO2 emissions KT;  
+ii.	 Percent of Land Urban;
+iii. Foreign Direct Investment net inflows as percent of GDP. 
+
+
+
+```{r}
+
+#Backward Stepwise
+model_back <- regsubsets(evi_s~., data = final_df, method = "backward", nvmax = 11)
+#Adjust R^2 
+plot(model_back, scale = "adjr2", main = "Adjusted R^2")
+summary(model_back)
+
+
+#Forward Stepwise
+model_forward <- regsubsets(evi_s~., data = final_df, nvmax = 11, nbest = 1, method = "forward")
+
+summary(model_forward)
+plot(model_forward, scale = "adjr2", main = "Adjusted R^2")
+
+
+
+#Hybrid stepwise
+model_hybrid <- regsubsets(evi_s~., data = final_df,nvmax = 11, nbest = 1, method = "seqrep")
+
+plot(model_hybrid, scale = "adjr2", main = "Adjusted R^2")
+summary(model_hybrid)
+
+```
+
+Based on the insight from the stepwise regressions, we developed Model 3 that Regressed scaled EVI on the following variables:
+
+1.	Total GHG Emissions KT
+2.	Percent of Ag Land
+3.  Percent of Population in Urban Areas
+4.	Percent of Rural Land
+5.	Mortality Rate Under 5 (1000 Births)
+6.  Renewable electricity output as a percent of total electricity output
+7.	Biodiversity Sub-Index (CBDEVI)
+8.	Climate Change Sub-Index (CCEVI)
+
+The following variables were statistically significant in Model 3:
+
+1.	Total GHG Emissions KT
+2.	Percent of Ag Land
+3.  Mortality Rate Under 5 (1000 Births)
+4.	Biodiversity Sub-Index (CBDEVI)
+5.	Climate Change Sub-Index (CCEVI)
+
+Additionally, since we ran a scaled regression where all independent variables were on the same scale, we can see that the variables with the largest estimetd coffecient or effect on the predcited scaled EVI are CCEVI and CBDEVI with the child mortality rate, percent of agricultural labnd, and greenhouse gas emission having much smaller effects. The results suggest that the ability of the natural environment to sustain future ecological shocks are largely a factor of climate change, diversity of the ecosystem, as well as releative economic development, all of which are anthropogenic in nature.  
+
+
+```{r}
+#Running lm model on final_df with vars identified to explain most variation from stepwise
+model_3<- lm(evi_s~greenhouse_gas+agricultural_land+ubran_pop+country_land_rural+mortality_rate+renewable_electricity+cbdevi_s+ccevi_s, final_df)
+ 
+
+summary(model_3)
+VIF(model_3)
+```
+
+To compare the three models we checked if the reduction in Residual SquareD Error is significant by running ANOVA Chi Squared tests on the models. From the test we learned that Model 3 had a statitically significantly higher VIF than Model 2.
+
+```{r}
+anova(model_1, model_2, test="Chisq")
+anova(model_1, model_3, test="Chisq")
+anova(model_2, model_3, test="Chisq")
+````
+
+Since the R^2 of Models 1 and 3 were statistically no different from zero and as Model 3 had a lower VIF, we chose Model 3 as the final model
+
+6.	Reliability of Model
+
+To assess the reliability of the model we calculated the Root Mean Squared Error (RMSE) in addition to estimating the R^2 and the adjusted-R^2 of the model. Additionally we developed confidence intervals for the model.
+
+```{r}
+#Developing RMSE
+library(dplyr)
+predictions <- predict(model_3,final_df)
+head(predictions)
+lm_real_pred <- data.frame(predictions,final_df$evi_s)
+head(lm_real_pred)
+lm_real_pred <- mutate(lm_real_pred,final_df$evi_s-predictions)
+head(lm_real_pred)
+names(lm_real_pred) <- c("pred","evi_s","error")
+head(lm_real_pred)
+mse <- data.frame(mean((lm_real_pred$error)^2))
+print(mse)
+rmse_model_3 <- sqrt(mse)
+print(rmse_model_3)
+summary(model_3)
+confint(model_3)
+`````
+
+While the model had a fairly high VIF, it was still lower than the rule of thumb of 5. Additionally, since it explained around 74% of the variation in the data and has a reasonable RMSE, we contend that the final model, i.e.,  Model 3, is reliable.
+
+7. Prediction
+
+While Model 3 allowed us to identify the factors that contribute to EVI, it also allowed us to predict EVI. To do the prediction we enetered the scaled values for the independent variables for Albania and estimated the predicted scaled EVI as well as the predicted EVI.
+
+Albania has an actual EVI of 329. Our model estimated a precited EVI of roughly 335, with a lower bound of 320 and an upper bound of 350. Since the actual EVI falls with in the confidence interval of the predicted EVI, it appers that model produced a fairly accurate predicetd value. 
+
+For more predictions, please vist the interactive EVi prediction dashboard at the url: https://public.tableau.com/profile/sadaf8581#!/vizhome/UnderstandingEnvironmentalVulnerability2/EVIPrediction
+
+
+
+```{r}
+newdata <- data.frame(greenhouse_gas=(-0.296749833), agricultural_land=(0.222613093), ubran_pop=(-0.544626968259807), country_land_rural=(0.085713184), mortality_rate=(-0.480929187), renewable_electricity=(2.282175968), cbdevi_s=(-0.452116127), ccevi_s=(0.673414477))
+
+
+
+newdata
+
+predicted_scaled_evi<-predict(model_3, newdata, interval="confidence")
+
+predicted_evi=((predicted_scaled_evi*52.16061529)+311.2447753)
+
+predicted_scaled_evi
+predicted_evi
+
+````
+
+9.	Limitations
+
+While the datasets used to answer our research question contained very rich information, each dataset did not contain data for all the same countries which resulted in a sample  of 178 countries in the final analytical dataset. Additionally, the datasets contained many missing values which we had to impute. Having data for all countries with non-missing observations would increase the explanatory power of the model and provide consistent results.
+
+Moreover, since the models were run on only 2004 EVI data, which was the only year available, we could only understand the factors behind EVI and predict EVI with data from just one year. Future research studies could develop the EVI scores for additional years based on the guidance provided by SOPAC and estimate a time series model that could likely better predict EVI.
+
+While the scaled regression allows us to compare the effect of each independent variable, all the results are in Z-scores which are not always easy to interpret. Readers should convert the scaled coefficients to their original units to make any meaningful interpretation.  
+
+Lastly, while the EVI is a robust and useful measure of environmental vulnerabilty, it is still a composite estimate of a set of sub-indicators and sub-indices. EVI scores coupled with other environmental indicators should be used to holistically assess the ability of the natural environment of a country or region to sustain future ecological shocks. 
+
+
+
+References
+
+Center for International Earth Science Information Network - CIESIN.      (2013). Low Elevation Coastal Zone (LECZ) Urban-Rural Population      and Land Area Estimates, Version 2. Retrieved April 9, 2017, from     NASA Socio Economic Data and Applications Center (SEDAC):             http://dx.doi.org/10.7927/H4MW2F2J
+
+Donner, W., & Rodríguez, H. (2011, January 1). Disaster Risk and          Vulnerability: The Role and Impact of Population and Society.         Retrieved from Population Reference Bureau:                           http://www.prb.org/Publications/Articles/2011/disaster-risk.aspx
+
+Gowrie, M. N. (2003). Environmental vulnerability index for the island     of Tobago, West Indies. Conservation Ecology 7, 11.
+
+Kaly, U.L.; C.R. Pratt; J. Mitchell. (2004). The Environmental            Vulnerability Index (EVI) 2004. New York: SOPAC.
+
+Kouakou, Y. E., Kone, B., Cisse, G., Dje, K. B., N'GO, Y. A., Konare,     A. A., & Savane, I. (2013). Environmental vulnerability index:        Application to the white bandama bassin in the northern côte          D'ivoire. International Journal of Conservation Science, 357-69 .
+
+South Pacific Applied Geoscience Commission - SOPAC; United Nations       Environmental Program - UNEP. (2004). Compendium of Environmental     Sustainability Indicator Collections: 2004 Environmental              Vulnerability Index (EVI). Palisades, NY: NASA Socioeconomic Data     and Applications Center (SEDAC).
+
+UN ISDR. (2005). Environment and Vulnerability: Emerging Prospects.       Geneva: UNEP.
+World Bank. (2017, April 9). Climate Change. Retrieved from World         Bank: http://data.worldbank.org/topic/climate-change
+
+
+
