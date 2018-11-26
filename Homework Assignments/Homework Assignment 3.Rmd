@@ -1,0 +1,127 @@
+---
+title: "Homework Assignment 3"
+author: "Nelson Foster"
+date: "February 19, 2017"
+output: html_document
+---
+
+Question 1. Load the dataset (green_tripdata_2015-01.csv).
+
+```{r}
+library(readr)
+library(ggplot2)
+green <- read.csv("green.csv")
+```
+
+Question 2. Determine if the trip_distance and Fare_amount variables are normal.
+
+```{r}
+hist(green$Trip_distance)
+```
+
+```{r}
+hist(green$Fare_amount)
+```
+
+Answer to question 2: The variables "Trip Distance" and "Fare Amount" are not normal, as they are both right-skewed.
+
+Question 3: Develop 99% confidence intervals for the trip_distance and fare_amount, using z scores.
+
+Trip Distance:
+
+```{r}
+
+trip_distance <- (green$Trip_distance)
+
+dist_sd <- sd(trip_distance)
+dist_mean <- mean(trip_distance)
+
+var(trip_distance)
+mean(trip_distance)
+sd(trip_distance)
+
+n <- length(trip_distance)
+n
+std.error <- qnorm(0.99)*dist_sd/sqrt(n)
+std.error
+lower.limit <- dist_mean-std.error
+upper.limit <- dist_mean+std.error
+lower.limit
+upper.limit
+```
+
+Fare Amount:
+
+```{r}
+fare_amount <- (green$Fare_amount)
+
+fare_sd <- sd(fare_amount)
+fare_mean <- mean(fare_amount)
+
+var(fare_amount)
+mean(fare_amount)
+sd(fare_amount)
+
+n <- length(fare_amount)
+n
+std.error <- qnorm(0.99)*fare_sd/sqrt(n)
+std.error
+lower.limit <- fare_mean-std.error
+upper.limit <- fare_mean+std.error
+lower.limit
+upper.limit
+```
+
+Question 4: Using z scores determine what percentile a 3 miles travel distance that costs $13 falls into?
+
+```{r}
+z <- (13-fare_mean)/fare_sd
+z
+pnorm(z)
+round(pnorm(z)*100,0)
+```
+Answer to question 4: A 3 mile travel distances that costs $13 falls into the 51st percentile. 
+
+Question 5: The null hypothesis for green cab fare amount is that the average fare is $12. From the 95% confidence interval, can you reject the null hypothesis?
+
+```{r}
+n <- length(fare_amount)
+n
+std.error <- qnorm(0.95)*fare_sd/sqrt(n)
+std.error
+lower.limit <- fare_mean-std.error
+upper.limit <- fare_mean+std.error
+lower.limit
+upper.limit
+t.test(fare_amount)
+```
+
+Answer to question 5: At the 95% confidence interval, you cannot reject the null hypothesis.
+
+Question 6: Understand Pearson and Spearman Correlation Coefficients by reading “Pearson vs Spearman.pdf” document.
+
+Answer to question 6: I was unable to locate the Pearson vs. Spearman.pdf document, but I found something similar: http://support.minitab.com/en-us/minitab-express/1/help-and-how-to/modeling-statistics/regression/supporting-topics/basics/a-comparison-of-the-pearson-and-spearman-correlation-methods/
+
+https://pdfs.semanticscholar.org/fc43/6b4aed1762e800cb242c8f5f5e99b157d8f0.pdf
+
+Question 7: Apply Pearson and Spearman measure on this data set (“trip_distance” and “fare_amount”) . Which one of these two is suitable for this scenario and why?
+
+```{r}
+pearson <-cor(trip_distance,fare_amount, use = "complete", method="pearson")
+spearman <- cor(trip_distance,fare_amount, use = "complete", method="spearman")
+pearson
+spearman
+```
+
+Answer to Question 7: A Spearman correlation is more suitable in this scenario, as the data is not a normal distribution. However, a Pearson correlation is still useful, as it evaluates the relationship between two linear variables, in this instance, trip distances and fare amounts.  Spearman, on the other hand, is more suitable for the evaluating the relationship between two continuous or ordinal (rank) variables.
+
+Question 8: Are “trip_distance” and “fare_amount” strongly correlated (Explain)?
+
+```{r}
+sml <- loess(trip_distance~fare_amount)
+plot(trip_distance,fare_amount)
+lines(predict(sml), col='red', lwd=2)
+scatter.smooth(trip_distance,fare_amount, family = "gaussian")
+```
+
+Answer to Question 8: Yes, there is a strong positive correlation between trip distance and fare amount (Pearson = 0.94, Spearman = 0.96)

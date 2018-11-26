@@ -1,0 +1,159 @@
+---
+title: "Homework Assignment 2"
+author: "Nelson Foster"
+date: "February 11, 2017"
+output: html_document
+---
+
+```{r}
+library(MASS)
+```
+
+Question 1: Use the summary function to get a summary of all the variables in the Pima.te dataset.
+
+```{r}
+summary(Pima.te)
+```
+
+Question 2: Get the structure of the pima dataset. 
+
+```{r}
+str(Pima.te)
+```
+
+Question 3: Get the variables from the dataset.
+
+```{r}
+names(Pima.te)
+```
+
+Question 4: For bmi and age variables, find out the following: mean, median, maximum, minimum, range, number of observations. 
+
+BMI
+```{r}
+Pima <- data.frame(Pima.te)
+#Mean
+mean(Pima[["bmi"]])
+#Median
+median(Pima[["bmi"]])
+#Max
+max(Pima[["bmi"]])
+#Min
+min(Pima[["bmi"]])
+#Range
+range(Pima[["bmi"]])
+#Number of Observations
+nrow(Pima)
+```
+
+Age
+```{r}
+Pima <- data.frame(Pima.te)
+#Mean
+mean(Pima[["age"]])
+#Median
+median(Pima[["age"]])
+#Max
+max(Pima[["age"]])
+#Min
+min(Pima[["age"]])
+#Range
+range(Pima[["age"]])
+#Number of Observations
+nrow(Pima)
+```
+
+Question 5: How many women are in this dataset?
+
+Answer: There are 332 women in this dataset. 
+
+Question 6: Select the first 5 observations and first four columns/variables from the dataset.
+
+```{r}
+Pima[1:5,1:4]
+```
+
+Question 7: Select the records where bmi is grater than or equal to 50.
+
+```{r}
+sub = subset(Pima, bmi == 50, select =c("bmi"))
+sub
+```
+
+Answer: There are 70 observations of BMI scores at or above 50. 
+
+
+Question 8: What percentage of the women have diabetes by WHO criteria?
+
+```{r}
+library(ggplot2)
+tbl <- table(Pima$type)
+cbind(tbl,prop.table(tbl))
+nrow(Pima)
+
+```
+Answer: According to WHO criteria, 33% of the women in the Pima study have diabetes.
+
+Question 9: Obtain a histogram for body mass index
+
+```{r}
+hist(Pima[["bmi"]])
+```
+
+Question 10: What are the mean and median for bmi? How far apart are they?
+
+Mean (bmi)
+```{r}
+mean(Pima[["bmi"]])
+```
+Median (bmi)
+```{r}
+median(Pima[["bmi"]])
+```
+Distance between mean and median:
+```{r}
+x1 <- mean(Pima$bmi)
+x2 <- median(Pima$bmi)
+dist(rbind(x1, x2))
+```
+Answer: The mean and median are 0.34 units apart. 
+
+Question 11: Get data from "vlbw.csv" file.
+
+```{r}
+library(readr)
+vlbw <- read_csv("vlbw.csv")
+```
+
+Question 12: Obtain a histogram of the length of stay, i.e. the number of days the infants stay in the neonatal intensive care unit (variable: hospstay)
+
+```{r}
+hist(vlbw$hospstay)
+```
+
+Question 13: Do you see data problems?
+
+Answer: Yes. According to the console output, there are missing column names in the dataset. This is creating some errant data, which is skewing histogram's range (-6000 to 4000) and the count of the hospital stays.
+
+Question 14: Draw a boxplot of the variable lowph. Visually estimate the median and quartiles from the plot.
+
+```{r}
+boxplot(vlbw$lowph)
+```
+
+
+Answer: Median: approx. 7.2; Q1: approx. 7.1;  Q3: 7.3.
+
+Question 15: Use the summary function to check your answers to the previous question. is it about the same?
+
+```{r}
+summary(vlbw$lowph)
+```
+
+Answer: Yes, there are more or less the same. 
+
+Question 16: The variable lowph contains the lowest ph in the first 4 days of life. Obtain a histogram of this variable (the variable is called lowph)
+
+```{r}
+hist(vlbw$lowph)
+```

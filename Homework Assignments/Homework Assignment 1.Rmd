@@ -1,0 +1,73 @@
+s---
+title: "Homework Assignment 1"
+author: "Nelson Foster"
+date: "February 4, 2017"
+output: html_document
+---
+
+Question 1: What is the difference between a package, library, and function?
+
+Answer to Question 1: a package is a collection of data, compiled code, and functions in a defined structure, or library. A library is a directory where R packages are stored. A function is a piece of code written to carry out a specific task or tasks. Functions can either be included in the package, or user defined. 
+
+Question 2: What are some ways you can find more information on R packages or datasets 
+Answer to Question 2: To find more information on R packages in datasets, use the help(package = "") function, and in the quotation marks, type the package name. You can also run the help.search function to query the help files on that pacakge.
+
+Question 3:
+Install the ISLR, doBy and Tidyerse packages and run the ISLR, doBy dplyr libraries.
+
+```{r}
+library(ISLR)
+library(doBy)
+library(dplyr)
+```
+
+There is a dataset called Auto in the ISLR Library. Create a dataframe using the Auto dataset and call it auto_frame. 
+
+```{r}
+data(Auto)
+auto_frame <- data.frame(Auto)
+```
+
+Run Basic functions to get to know auto_frame
+
+```{r}
+summary(auto_frame)
+fix(auto_frame)
+head(auto_frame)
+```
+
+Run basic summary statistics to further explore the dataset
+
+```{r}
+pastecs::stat.desc(auto_frame)
+sapply (Auto, function(x) length(unique(x)))
+str(auto_frame)
+```
+
+Use the doBy summaryBy function to create a new data frame called avempg_year_cyl and reorganize teh data to determine the average mileage per gallon per year and cylinder.
+
+```{r}
+library(doBy)
+avempg_year_cyl <- summaryBy(mpg ~ year + cylinders, data=Auto)
+avempg_year_cyl
+```
+
+Question 4:
+
+Use the dplyr library and the dplyr cheat sheet in the lecture 2 file on BB to produce a similar table. 
+
+```{r}
+library(dplyr)
+Auto %>%
+  group_by(year, cylinders) %>%
+  summarise(avempg = mean(mpg))
+```
+
+Question 5:
+
+Which did you like better and why?
+
+I liked the dplyr way better, it seems to be more efficient, although it took quite a while to figure out. 
+
+
+

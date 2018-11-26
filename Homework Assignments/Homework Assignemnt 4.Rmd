@@ -1,0 +1,225 @@
+---
+title: "Homework Assignment 4"
+author: "Nelson Foster"
+date: "March 31, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Information on the NFL 2008 Field Goal Data
+
+Dataset: nfl2008_fga.csv
+
+Source:  advancedfootballanalytics.com
+
+Descriptition: Results of all NFL regular season field goal attempts
+for the 2008 season.
+
+Variable Names/Descriptions
+GameDate
+AwayTeam
+HomeTeam
+qtr   (quarter, 5=overtime)
+min   (minutes remaining)
+sec   (seconds remaining, added to minutes)
+kickteam   (Team kicking field goal)
+def        (Defending Team)
+down 
+togo       (Yards to go for 1st down)
+kicker     (ID #)
+ydline     (yardline of kicking team)
+name       (kicker's name)
+distance   (yards)
+homekick   (1 if kicker at Home, 0 if Away)
+kickdiff   (Kicking team lead +, or deficit -, prior to kick)
+timerem    (Time remaining in seconds, negative ==> overtime)
+offscore   (kicking team's score prior to kick)
+defscore   (  defense  "     "     "    "   ")
+season     (2008)
+GOOD       (1 if Success, 0 if Miss)
+Missed     (Missed, not blocked =1, 0 ow)
+Blocked    (1 if Blocked, 0 ow)
+
+
+
+Problem A
+Usint the NFL FGA Data from 2008 in the Lecture 7 folder, create a model that can "accurately" (just do your best) classify missed versus good (made) field goals using logistic regression. In doing so, answer the following questions:
+-Which variables contribute most to your model
+
+-- Distance and Time Remaining contributed most to my model. 
+-What is your "hit rate," using 50% as the break point?
+--My hit rate was .115.
+-What is your ROC/AUC?
+--My AUC was .516, and my ROC/McFadden score was .159
+-Holding all other variables in your model constant (or at an average), what are the chances of making a 50 yard field goal?
+--There is approximately a 60% chance of making a 50 yard field goal. 
+-What additional information might be helpful?
+--Data on weather conditions would have been a helpful variable to assess. 
+
+```{r}
+require(knitr)
+library(ISLR)
+library(dplyr)
+library(ROCR)
+library(pROC)
+library(pscl)
+library(ResourceSelection)
+
+```
+
+```{r}
+fgdata <- read.csv("nfl2008_fga.csv")
+head(fgdata)
+tail(fgdata)
+str(fgdata)
+str(GOOD)
+structure(fgdata)
+
+fgdata$down <- factor(fgdata$down)
+fgdata$qtr <- factor(fgdata$qtr)
+```
+
+```{r}
+names(fgdata)
+```
+
+```{r}
+
+#creating train and test dataframes
+
+fgtrain <- fgdata[1:831, ]
+fgtest <- fgdata[832:1039, ]
+
+```
+
+```{r}
+
+#initial model
+fg.model <- glm(GOOD~.,family = binomial(link = "logit"),fgtrain)
+summary(fg.model)
+
+```
+
+```{r}
+#revised models to drop extranneous variables
+
+fgmodel2 <- glm(GOOD~ydline+distance+homekick+kickdiff+qtr,family="binomial"(link = "logit"),fgtrain)
+summary(fgmodel2)
+#fgmodel3 <- glm(GOOD~timerem+distance, family="binomial"(link = "logit"), fgtrain)
+fgmodel3 <- glm(GOOD~distance, family="binomial"(link = "logit"), fgdata)
+summary(fgmodel3)
+
+fgmodel2.output <- exp(coef(fgmodel2))
+fgmodel2.output
+fgmodel3.output <- exp(coef(fgmodel3))
+fgmodel3.output
+```
+
+```{r}
+#analyzing the results
+
+anova(fg.model, test = "Chisq")
+anova(fgmodel2, test  = "Chisq")
+anova(fgmodel3, test = "Chisq")
+```
+
+
+
+
+
+```{r}
+
+
+#additional predictions and evaluation of model (hit rate)
+fgpred.model3 <- predict(fgmodel3,fgtest,type='response')
+
+
+fgpred.model3 <- ifelse(fgpred.model3 > 0.5,1,0)
+head(fgpred.model3)
+fgmodel3hit <- mean(fgpred.model3==fgtest$GOOD)
+fgmodel3hit
+
+fgtest %>% group_by(GOOD) %>%
+  summarise(no_rows = length(GOOD))
+
+
+head(fgtest$GOOD)
+fgmodel3hit.1 <- mean(fgpred.model3==as.numeric(fgtest$GOOD))
+fgmodel3hit.1
+
+```
+
+
+
+```{r}
+
+#setting the prediction and reviewing false postives 
+fgnewpred <- prediction(fgpred.model3,fgtest$GOOD)
+
+fgnewpred.performance <- performance(fgnewpred, measure = "tpr",x.measure = "fpr")
+#then we plot these two measures
+plot(fgnewpred.performance)
+
+fgAUC <- performance(fgnewpred, measure = "auc")
+fgAUC
+```
+
+
+
+
+
+
+
+```{r}
+fgxx <- data.frame(GOOD="1",distance=50)
+
+```
+
+```{r}
+#attempt at plotting the prediction
+
+fgxxpred <- predict(fgmodel3,type='response')
+fgxxpred
+head(fgxxpred)
+scatter.smooth(fgxxpred , xlab = "Field Goals", ylab = "Likelihood of 50 Yard Field Goal ")
+fgxx <- data.frame(distance=50)
+summary(fgxx)
+summary(fgmodel3)
+fgxxpred.1 <- predict(fgmodel3,fgxx)
+fgxxpred.1
+
+```
+
+
+
+```{r}
+#plotting the logistic regression 
+fglogit <- glm(GOOD~timerem+distance, family = binomial(link = "logit"), data = fgdata)
+
+hoslem.test(fgdata$GOOD, fitted(fglogit))
+prob=predict(fglogit, type = c("response"))
+fgdata$prop=prob
+
+fg <- roc(GOOD~prob, data=fgdata)
+pR2(fglogit)
+plot(fg)
+```
+
+```{r}
+summary(GOOD)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
